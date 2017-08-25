@@ -12,8 +12,60 @@
 	    (is factor used-in? second)))))
 
 
-(define (inverse ...)
-  ...)
+(define (extract-left operation formula)
+  (match operation
+    (`(+ ,left ,right)
+     `(- ,formula ,right))
+    (`(* ,left ,right)
+     `(/ ,formula right))
+    (`(- ,left ,right)
+     `(+ ,formula ,right))
+    (`(/ ,left ,right)
+     `(* ,fomula ,right))))
+
+
+(assert (lambda (a b)
+	  (= (* a b) (* b a))))
+
+(assert (lambda (a b)
+	  (= (+ a b) (+ b a))))
+
+(assert (lambda (a b c)
+	  (equal? (= (+ a b) c) (= a (- c b)))))
+
+(assert (lambda (a b c)
+	  (equal? (= (+ a b) c) (= b (- c a)))))
+
+(assert (lambda (a b c)
+	  (if (isnt b zero?)
+	      (equal? (= (* a b) c) (= a (/ c b))))))
+
+(assert (lambda (a b c)
+	  (if (isnt a zero?)
+	      (equal? (= (* a b) c) (= b (/ c a))))))
+
+(assert (lambda (a b c)
+	  (if (isnt b zero?)
+	      (equal? (= (/ a b) c) (= a (* c b))))))
+
+(assert (lambda (a b c)
+	  (if (and (isnt b zero?) (isnt c zero?))
+	      (equal? (= (/ a b) c) (= 
+
+
+(define (extract-right operation formula)
+  (match operation
+    (`(+ ,left ,right)
+     `(- ,formula ,left))
+    (`(* ,left ,right)
+     `(/ ,formula ,left))
+    (`(
+    
+    
+(e.g.
+ (strip-left '(+ a b) 'c) ===> (- c b))
+
+
 
 (define (extract factor #;from source #;into target)
   (if (equal? factor source)
@@ -23,6 +75,7 @@
 		    (is factor used-in? second))
 	       'oops)
 	      ((is factor used-in? first)
+	       
 	       ...)
 	      ((is factor used-in? right)
 	       ...)))))
