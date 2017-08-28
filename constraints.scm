@@ -7,7 +7,7 @@
 (define (used-in? factor formula)
   (or (equal? factor formula)
       (and-let* (((<.> first second) formula)
-		 ((operator? <.>)))
+		 #;((operator? <.>)))
 	(or (is factor used-in? first)
 	    (is factor used-in? second)))))
 
@@ -16,13 +16,15 @@
   (match operation
     (`(+ ,left ,right)
      `(- ,formula ,right))
+
     (`(* ,left ,right)
-     `(/ ,formula right))
+     `(/ ,formula ,right))
+    
     (`(- ,left ,right)
      `(+ ,formula ,right))
+    
     (`(/ ,left ,right)
-     `(* ,fomula ,right))))
-
+     `(* ,formula ,right))))
 
 (assert (lambda (a b)
 	  (= (* a b) (* b a))))
@@ -48,23 +50,19 @@
 	  (if (isnt b zero?)
 	      (equal? (= (/ a b) c) (= a (* c b))))))
 
-(assert (lambda (a b c)
-	  (if (and (isnt b zero?) (isnt c zero?))
-	      (equal? (= (/ a b) c) (= 
-
-
 (define (extract-right operation formula)
   (match operation
     (`(+ ,left ,right)
      `(- ,formula ,left))
+    
     (`(* ,left ,right)
      `(/ ,formula ,left))
-    (`(
     
+    (`(- ,left ,right)
+     `(- ,left ,formula))
     
-(e.g.
- (strip-left '(+ a b) 'c) ===> (- c b))
-
+    (`(/ ,left ,right)
+     `(/ ,left ,formula))))
 
 
 (define (extract factor #;from source #;into target)
@@ -75,10 +73,11 @@
 		    (is factor used-in? second))
 	       'oops)
 	      ((is factor used-in? first)
-	       
-	       ...)
-	      ((is factor used-in? right)
-	       ...)))))
+	       (let ((target* (extract-left source target)))
+		 (extract factor first target*)))
+	      ((is factor used-in? second)
+	       (let ((target* (extract-right source target)))
+		 (extract factor second target*)))))))
 
 (define (untangle factor #;from equation)
   (let ((('= left right) equation))
@@ -90,7 +89,32 @@
 	  ((is factor used-in? right)
 	   (extract factor #;from right #;into left)))))
 
+;;(untangle 'e '(= (* a (/ b (+ c (- d e)))) f))
 
 (e.g.
- (untangle 'a #;from '(= (/ a b) (/ c d))) ===> (* b (/ c d))
- (untangle 'b #;from '(= (/ a b) (/ c d))) ===> )
+ (untangle 'a #;from '(= (/ a b) (/ c d))) ===> (* (/ c d) b))
+
+
+
+(define (factor? x)
+  (or (number? x)
+      (symbol? x)))
+
+(define (factors formula)
+  (if (factor? formula)
+      `(,formula)
+      (let (((operator . operands) formula))
+	(apply union (map factors operands)))))
+(e.g.
+ (factors '(= (/ a b) (/ c d))) ===> (c d b a))
+
+(define (assert x)
+  (assert (and (equation? x)
+	       (every (lambda (factor)
+			(or (location? factor)
+			    (number? factor)))
+		      (factors x))))
+  (let ((locations (filter location? (factors x))))
+    ...))
+    
+    
