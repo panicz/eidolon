@@ -137,8 +137,6 @@
 
 (module-define! (current-module) 'x 5)
 
-(declare x)
-
 (define-syntax (impose constrain)
   
   
@@ -156,10 +154,39 @@
 		      (factors x))))
   (let ((locations (filter location? (factors x))))
     ...))
-    
+
 
 
 (define inhibited-observers (make-parameter '()))
+
+(define (update! pending-variables+new-values
+		 #;remembering updated-variables
+			       #;minding conflicting-variables)
+  (if (null? pending-variables+new-values)
+      conflicting-variables
+      (let* ((updated (map (lambda (`(,variable . ,value))
+			     (variable-set! variable value)
+			     variable)
+			   pending-variables+new-values))
+	     (updated-variables (union updated updated-variables))
+	     (notified (difference (append-map observers updated)
+				   conflicting-variables))
+	     (changes (filter-map
+		       (lambda (observer)
+			 (and (isnt observer member conflicting-variables)
+			      (let ((new-value (eval (formula observer)
+						     (current-module)))
+				    (old-value (variable-ref observer)))
+				(and (isnt new-value equal? old-value)
+				     `(,observer . ,new-value)))))
+		       notified))
+	     (conflicting-variables (union conflicting-variables
+					   (filter-map
+					    (lambda (`(,variable . ,value))
+						(is variable member
+						    updated-variables))
+					    changes))))
+	(update! changes updated-variables conflicting-variables))))
 
 (define (assign! variable value)
   (let* ((inhibited (inhibited-observers))
@@ -170,4 +197,4 @@
 	(inform! observer value variable)))))
 
 (define (inform! target #;about new-value #;of soruce)
-  
+  ...)
