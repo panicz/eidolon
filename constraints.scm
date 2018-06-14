@@ -1,7 +1,9 @@
 (define-module (constraints)
   #:use-module (grand scheme)
   #:use-module (assignable-procedures)
-  
+  #:export (keep-updating!)
+  ;;#:replace ((assign! . set!))
+  #:export-syntax (assign! impose))
 
 (define (operator? x)
   (is x member '(+ - / *)))
@@ -9,7 +11,7 @@
 (define (used-in? factor formula)
   (or (equal? factor formula)
       (and-let* ((`(,<.> ,first ,second) formula)
-		 #;((operator? <.>)))
+		 ((operator? <.>)))
 	(or (is factor used-in? first)
 	    (is factor used-in? second)))))
 
@@ -88,23 +90,11 @@
 (e.g.
  (factors '(= (+ (* x 5) 7) 0)) ===> (0 7 5 x))
 
-(untangle 'x '(= (+ (* x 5) 7) 0))
+(e.g.
+ (untangle 'x '(= (+ (* x 5) 7) 0)) ===> (/ (- 0 7) 5))
 
 (define (variables formula)
   (filter symbol? (factors formula)))
-
-;; Potrzeba troszkę eseistyki.
-;; Chcielibyśmy mieć coś takiego, że jak zmienimy wartość zmiennej,
-;; to informujemy o tym wszystkich obserwatorów.
-;; W związku z tym, każda zmienna powinna mieć listę obserwatorów,
-;; zaś każdy obserwator powinien dysponować formułą na ponowne obliczanie
-;; jego wartości.
-
-;; Teraz tak. W jaki sposób mielibyśmy użyć naszych asercji?
-;; Zakładamy, że mamy sobie funkcję/makro impose, która musi:
-
-;; 1. sprawdzić, jakich zmiennych dotyczy obserwabla
-;; 2. zadeklarować rzeczone zmienne
 
 (define# (observers variable) '())
 
@@ -116,7 +106,8 @@
   (let ((module (current-module)))
     (or (module-variable module name)
 	(let ((fresh (make-undefined-variable)))
-	  (module-define! module name fresh)))))
+	  (module-define! module name fresh)
+	  fresh))))
 
 (define (keep-updating! observer #;about source #;using recipe)
   ;;(assert (and (symbol? observer?) (symbol? source)))
@@ -132,8 +123,8 @@
     (set! (formula observer-variable) recipe)))
 
 (define-syntax (impose constrain)
-  (for var in (variables constrain)
-    (let* ((formula (untangle var #;from constrain))
+  (for var in (variables 'constrain)
+    (let* ((formula (untangle var #;from 'constrain))
 	   (value-dependencies (variables formula)))
       (set! (dependencies var) value-dependencies)
       (for dependency in value-dependencies
@@ -160,4 +151,12 @@
       (update! changes updated))))
 
 (define-syntax (assign! variable value)
-  (update! `(,(module-ref (current-module) 'variable) . ,value) '()))
+  (update! `((,(module-variable (current-module) 'variable) . ,value)) '()))
+
+(e.g.
+ (begin
+   (define x 5)
+   (define y 1/5)
+   (impose (= x (/ 1 y)))
+   (assign! x 6)
+   y) ===> 1/6)
