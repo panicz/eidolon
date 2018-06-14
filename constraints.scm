@@ -15,7 +15,7 @@
   (match operation
     (`(+ ,left ,right)
      `(- ,formula ,right))
-
+    
     (`(* ,left ,right)
      `(/ ,formula ,right))
     
@@ -137,64 +137,75 @@
 
 (module-define! (current-module) 'x 5)
 
+
+(define-syntax (lambda! params body . *)
+  (let ((default (lambda params body . *))
+	(patches (make-hash-table)))
+    (make-procedure-with-setter
+     (lambda args
+       (match (hash-get-handle patches args)
+	 (`(,key . ,value)
+	  value)
+	 (_
+	  (apply default args))))
+     (lambda args
+       (hash-set! patches (drop-right args 1) (last args))))))
+
+(define-syntax (define! (mapping . args) body . *)
+  (define mapping (lambda! args body . *)))
+
+(define! (observers variable) '())
+
+(define! (formula variable) #f)
+
+(define! (dependencies variable) '())
+
+(define (possibly-fresh-variable name)
+  (let ((module (current-module)))
+    (or (module-variable module name)
+	(let ((fresh (make-undefined-variable)))
+	  (module-define! module name fresh)))))
+
+(define (keep-updating! observer #;about source #;using recipe)
+  ;;(assert (and (symbol? observer?) (symbol? source)))
+  (let* ((observer-variable (possibly-fresh-variable observer))
+	 (source-variable (possibly-fresh-variable source))
+	 (source-observers (observers source-variable))
+	 (old-recipe (formula observer-variable))) 
+    (unless (is observer-variable member source-observers)
+      (set! (observers source-variable) `(,observer-variable
+					  . , source-observers)))
+    (when (and old-recipe (isnt recipe equal? old-recipe))
+      (warn "Overwriting" old-recipe "with" recipe "in" observer))
+    (set! (formula observer-variable) recipe)))
+
 (define-syntax (impose constrain)
-  
-  
-  )
+  (for var in (variables constrain)
+    (let* ((formula (untangle var #;from constrain))
+	   (value-dependencies (variables formula)))
+      (set! (dependencies var) value-dependencies)
+      (for dependency in value-dependencies
+	(keep-updating! var #;about dependency #;using formula)))))
 
-(let ((z 5))
-  (defined? 'x))
+(define (recalculate variable)
+  (when (every defined? (dependencies variable))
+    (eval (formula variable) (current-module))))
 
-  
-(define (assert x)
-  (assert (and (equation? x)
-	       (every (lambda (factor)
-			(or (location? factor)
-			    (number? factor)))
-		      (factors x))))
-  (let ((locations (filter location? (factors x))))
-    ...))
+(define (update! variables+values updated)
+  (unless (null? variables+values)
+    (let* ((modified (filter-map (lambda (`(,variable . ,value))
+				   (and (isnt value equal?
+					      (variable-ref variable))
+					(variable-set! variable value)
+					variable))
+				 variables+values))
+	   (updated (union updated modified))
+	   (notified (fold-left union '() (filter (isnt _ memq updated)
+						  (map observers modified))))
+	   (changes (map (lambda (observer)
+			   `(,observer . ,(recalculate observer)))
+			 notified)))
+      (update! changes updated))))
 
-
-
-(define inhibited-observers (make-parameter '()))
-
-(define (update! pending-variables+new-values
-		 #;remembering updated-variables
-			       #;minding conflicting-variables)
-  (if (null? pending-variables+new-values)
-      conflicting-variables
-      (let* ((updated (map (lambda (`(,variable . ,value))
-			     (variable-set! variable value)
-			     variable)
-			   pending-variables+new-values))
-	     (updated-variables (union updated updated-variables))
-	     (notified (difference (append-map observers updated)
-				   conflicting-variables))
-	     (changes (filter-map
-		       (lambda (observer)
-			 (and (isnt observer member conflicting-variables)
-			      (let ((new-value (eval (formula observer)
-						     (current-module)))
-				    (old-value (variable-ref observer)))
-				(and (isnt new-value equal? old-value)
-				     `(,observer . ,new-value)))))
-		       notified))
-	     (conflicting-variables (union conflicting-variables
-					   (filter-map
-					    (lambda (`(,variable . ,value))
-						(is variable member
-						    updated-variables))
-					    changes))))
-	(update! changes updated-variables conflicting-variables))))
-
-(define (assign! variable value)
-  (let* ((inhibited (inhibited-observers))
-	 (observers (difference (observers variable) inhibited)))
-    (set-value! variable value)
-    (parameterize ((inhibited-observers `(,variable ,@observers ,@inhibited)))
-      (for observer in observers
-	(inform! observer value variable)))))
-
-(define (inform! target #;about new-value #;of soruce)
-  ...)
+(define-syntax (assign! variable value)
+  (update! `(,(module-ref (current-module) 'variable) . ,value) '()))
