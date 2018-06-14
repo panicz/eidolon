@@ -1,11 +1,9 @@
-#;(define-module (constraints)
+(define-module (constraints)
   #:use-module (grand scheme)
   #:use-module (assignable-procedures)
   #:export (keep-updating!)
   #:replace ((assign! . set!))
   #:export-syntax (assign! impose))
-
-(use-modules (grand scheme) (assignable-procedures))
 
 (define (operator? x)
   (is x member '(+ - / *)))
