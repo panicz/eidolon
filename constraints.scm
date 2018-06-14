@@ -1,4 +1,7 @@
-(use-modules (grand scheme))
+(define-module (constraints)
+  #:use-module (grand scheme)
+  #:use-module (assignable-procedures)
+  
 
 (define (operator? x)
   (is x member '(+ - / *)))
@@ -9,7 +12,6 @@
 		 #;((operator? <.>)))
 	(or (is factor used-in? first)
 	    (is factor used-in? second)))))
-
 
 (define (extract-left operation formula)
   (match operation
@@ -39,7 +41,6 @@
     (`(/ ,left ,right)
      `(/ ,left ,formula))))
 
-
 (define (extract factor #;from source #;into target)
   (if (equal? factor source)
       target
@@ -64,8 +65,6 @@
 	  ((is factor used-in? right)
 	   (extract factor #;from right #;into left)))))
 
-(untangle 'e '(= (* a (/ b (+ c (- d e)))) f))
-
 (e.g.
  (untangle 'a #;from '(= (/ a b) (/ c d))) ===> (* (/ c d) b))
 
@@ -78,7 +77,6 @@
       `(,formula)
       (let ((`(,operator . ,operands) formula))
 	(apply union (map factors operands)))))
-
 
 (define-syntax (assert property)
   (unless property
@@ -108,57 +106,11 @@
 ;; 1. sprawdzić, jakich zmiennych dotyczy obserwabla
 ;; 2. zadeklarować rzeczone zmienne
 
-(use-modules (ice-9 local-eval))
+(define# (observers variable) '())
 
-(define *observers* (make-hash-table))
+(define# (formula variable) #f)
 
-(define (observable? var)
-  (and (variable? var)
-       (hashq-ref *observers* var)))
-
-(define (make-observable! name module #:= (current-module))
-  (let ((variable (or (module-variable module name)
-		      (make-undefined-variable))))
-    (unless (observable? variable)
-      (hashq-set! *observers* variable '()))))
-
-(define-syntax (declare variable)
-  (make-observable! 'variable))
-
-(make-observable! 'x)
-
-(observable? (module-variable (current-module) 'x))
-
-(let ((x 10))
-  (set! x 7)
-  (local-eval '(variable? x) (the-environment)))
-
-(eval '(defined? 'x) (current-module))
-
-(module-define! (current-module) 'x 5)
-
-
-(define-syntax (lambda! params body . *)
-  (let ((default (lambda params body . *))
-	(patches (make-hash-table)))
-    (make-procedure-with-setter
-     (lambda args
-       (match (hash-get-handle patches args)
-	 (`(,key . ,value)
-	  value)
-	 (_
-	  (apply default args))))
-     (lambda args
-       (hash-set! patches (drop-right args 1) (last args))))))
-
-(define-syntax (define! (mapping . args) body . *)
-  (define mapping (lambda! args body . *)))
-
-(define! (observers variable) '())
-
-(define! (formula variable) #f)
-
-(define! (dependencies variable) '())
+(define# (dependencies variable) '())
 
 (define (possibly-fresh-variable name)
   (let ((module (current-module)))
