@@ -1,9 +1,11 @@
-(define-module (constraints)
+#;(define-module (constraints)
   #:use-module (grand scheme)
   #:use-module (assignable-procedures)
   #:export (keep-updating!)
-  ;;#:replace ((assign! . set!))
+  #:replace ((assign! . set!))
   #:export-syntax (assign! impose))
+
+(use-modules (grand scheme) (assignable-procedures))
 
 (define (operator? x)
   (is x member '(+ - / *)))
@@ -135,23 +137,36 @@
     (eval (formula variable) (current-module))))
 
 (define (update! variables+values updated)
-  (unless (null? variables+values)
-    (let* ((modified (filter-map (lambda (`(,variable . ,value))
-				   (and (isnt value equal?
-					      (variable-ref variable))
-					(variable-set! variable value)
-					variable))
-				 variables+values))
-	   (updated (union updated modified))
-	   (notified (fold-left union '() (filter (isnt _ memq updated)
-						  (map observers modified))))
-	   (changes (map (lambda (observer)
-			   `(,observer . ,(recalculate observer)))
-			 notified)))
-      (update! changes updated))))
+  (if (null? variables+values)
+      updated
+      (let* ((modified (filter-map (lambda (`(,variable . ,value))
+				     (and (isnt value equal?
+						(variable-ref variable))
+					  (variable-set! variable value)
+					  variable))
+				   variables+values))
+	     (updated (union updated modified))
+	     (notified (difference (fold-left union '() (map observers modified))
+				   updated))
+	     (changes (map (lambda (observer)
+			     `(,observer . ,(recalculate observer)))
+			   notified)))
+	(update! changes updated))))
 
-(define-syntax (assign! variable value)
-  (update! `((,(module-variable (current-module) 'variable) . ,value)) '()))
+(define-syntax assign*
+  (syntax-rules ()
+    ((assign* variables+values)
+     (assing* variables+values ()))
+    
+    ((assign* () ((variable value) ...))
+     (update!
+      `((,(module-variable (current-module) 'variable) . ,value) ...) '()))
+    
+    ((assign* (variable value . rest) processed)
+     (assign* rest ((variable value) . processed)))))
+
+(define-syntax (assign! variable value . rest)
+  (assign* (variable value . rest) ()))
 
 (e.g.
  (begin
@@ -160,3 +175,13 @@
    (impose (= x (/ 1 y)))
    (assign! x 6)
    y) ===> 1/6)
+
+(e.g.
+ (begin
+   (define a 2)
+   (define b 3)
+   (define c 6)
+   (impose (= (* a b) c))
+   (print (observers a))
+   (assign! a 5 b 10)
+   c) ===> 50)
