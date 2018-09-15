@@ -3,7 +3,7 @@
   #:use-module (assignable-procedures)
   #:use-module (notifying-assignment)
   #:export-syntax (impose)
-  #:export (constraint-variables untangle))
+  #:export (constraint-variables untangle revoke-constraint!))
 
 (use-modules (grand scheme)
 	      (assignable-procedures)
@@ -107,17 +107,21 @@
 (define-macro (impose constraint)
   (let ((expressions (constraint-variables constraint))
 	(_ (make-symbol "_")))
-    `(begin . ,(map (lambda (expression)
+    `(list . ,(map (lambda (expression)
 		      (let ((others (delete expression
 					    #;from expressions)))
 			`(on-change ,expression
-				    (lambda ,_
+				    (primitive-lambda ,_
 				      . ,(map (lambda (observer)
 						`(set! ,observer
 						       ,(untangle observer
 								  constraint)))
 					      others)))))
 		    expressions))))
+
+(define (revoke-constraint! constraint)
+  (for notification in constraint
+    (revoke-notification! notification)))
 
 #|
 ;; We don't want these symbols to clutter global namespace

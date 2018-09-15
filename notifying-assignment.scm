@@ -2,7 +2,10 @@
   #:use-module (grand scheme)
   #:use-module (assignable-procedures)
   #:replace ((notifying-set! . set!))
-  #:export (observers inhibited? on-inhibited-location-update)
+  #:export (observers
+	    inhibited?
+	    on-inhibited-location-update
+	    revoke-notification!)
   #:export-syntax (on-change reference))
 
 (define (assert proposition)
@@ -20,8 +23,15 @@
 
 (define-syntax (on-change location action)
   (assert (procedure? action))
-  (let ((target (reference location)))
-    (set! (observers target) `(,action . ,(observers target)))))
+  (let ((target (reference location))
+	(notifier action))
+    (set! (observers target) `(,notifier . ,(observers target)))
+    `(,target ,notifier)))
+
+(define (revoke-notification! `(,reference ,action))
+  (let ((notifiers (observers reference)))
+    (set! (observers reference) (without-first (is _ eq? action)
+					       notifiers))))
 
 (define on-inhibited-location-update
   (make-parameter (lambda (location value)
